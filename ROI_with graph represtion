@@ -1,0 +1,108 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+good_count = 0
+bad_count = 0
+
+cap = cv2.VideoCapture(0)
+
+print("Press 'p' to capture product")
+print("Press 'q' to finish inspection")
+
+while True:
+
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    h, w, _ = frame.shape
+
+    # inspection box
+    x1 = int(w * 0.35)
+    y1 = int(h * 0.3)
+    x2 = int(w * 0.65)
+    y2 = int(h * 0.7)
+
+    cv2.rectangle(frame,(x1,y1),(x2,y2),(255,255,255),2)
+
+    cv2.putText(frame,"Place Product Here",
+                (x1-40,y1-10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,(255,255,255),2)
+
+    cv2.imshow("Product Inspection",frame)
+
+    key = cv2.waitKey(1)
+
+    if key == ord('p'):
+
+        captured = frame.copy()
+
+        roi = captured[y1:y2, x1:x2]
+
+        gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+        blur = cv2.GaussianBlur(gray,(5,5),0)
+
+        # detect object edges
+        edges = cv2.Canny(blur,50,150)
+
+        contours,_ = cv2.findContours(edges,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+
+        object_found = False
+
+        for c in contours:
+            area = cv2.contourArea(c)
+
+            if area > 2000:   # minimum product size
+                object_found = True
+                break
+
+        if not object_found:
+
+            cv2.putText(captured,"PLACE PRODUCT",
+                        (x1-20,y1+40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,(0,0,255),3)
+
+            cv2.imshow("Inspection Result",captured)
+            cv2.waitKey(2000)
+            continue
+
+        # product inspection logic
+        brightness = np.mean(gray)
+
+        if brightness > 100:
+            status = "OK"
+            color = (0,255,0)
+            good_count += 1
+        else:
+            status = "NOT OK"
+            color = (0,0,255)
+            bad_count += 1
+
+        cv2.rectangle(captured,(x1,y1),(x2,y2),color,3)
+
+        cv2.putText(captured,status,
+                    (x1+40,y1+40),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,color,3)
+
+        cv2.imshow("Inspection Result",captured)
+
+        cv2.waitKey(2000)
+
+    if key == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
+
+# graph
+labels = ['Good Products','Bad Products']
+values = [good_count,bad_count]
+
+plt.bar(labels,values)
+plt.title("Production Quality Ratio")
+plt.ylabel("Number of Products")
+plt.show()
